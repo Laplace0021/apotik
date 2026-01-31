@@ -26,7 +26,7 @@ const authMiddleware = async(req,res,next)=>{
                 name: true,
                 email: true,
                 createAt: true,
-                // role: true // Uncomment jika ada
+                role: true // Uncomment jika ada
                 // Password TIDAK dipilih, jadi aman.
             }
         });
