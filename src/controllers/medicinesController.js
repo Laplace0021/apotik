@@ -76,42 +76,59 @@ const updateMedicine = async (req, res) => {
 }
 
 
-const deleteMedicine= async(req,res)=>{
-    const {id} = req.param;
-    try{
-        if (req.user.role !== "admin"){
-           return res.status(403).json({error:"you are not allowed to update this table"})  
+const deleteMedicine = async (req, res) => {
+    const { id } = req.params; // Perbaikan dari req.param ke req.params
+    try {
+        if (req.user.role !== "admin") {
+            return res.status(403).json({ error: "Access denied" });
         }
+        
         await prisma.medicine.update({
-            where: {id: id},
-            data: {
-                isDeleted: true
-            }
-        })
+            where: { id: id },
+            data: { isDeleted: true }
+        });
 
         res.status(200).json({
             status: "success",
             message: "Medicine deleted successfully"
-        })
-
-
-    } catch(error){
-        if (error.code === 'P2025') {
-            return res.status(404).json({ error: "Medicine not found" });
-        }
+        });
+    } catch (error) {
         res.status(500).json({ error: error.message });
     }
 }
 
 const getMedicine = async (req, res) => {
     try {
-        const medicines = await prisma.medicine.findMany({
-            where: {
-                isDeleted: false 
-            },
+        // 1. Ambil query parameter dari URL
+        const { search, category } = req.query;
 
+        // 2. Bangun filter 'where' secara dinamis
+        const whereClause = {
+            isDeleted: false, // Filter utama: jangan ambil yang sudah dihapus
+        };
+
+        // Jika ada pencarian nama
+        if (search) {
+            whereClause.name = {
+                contains: search,
+                mode: 'insensitive', // Case-insensitive
+            };
+        }
+
+        // Jika ada filter kategori (berdasarkan nama kategori)
+        if (category && category !== "Semua Obat") {
+            whereClause.category = {
+                name: category // Filter relasi ke tabel Category berdasarkan field 'name'
+            };
+        }
+
+        const medicines = await prisma.medicine.findMany({
+            where: whereClause,
             include: {
                 category: true 
+            },
+            orderBy: {
+                name: 'asc' // Urutkan abjad agar rapi
             }
         });
 
@@ -121,7 +138,7 @@ const getMedicine = async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
-    }
+  }
 };
 const getMedicineById = async (req, res) => {
     const { id } = req.params;
