@@ -1,0 +1,78 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       String   @id @default(uuid())
+  name     String 
+  email    String   @unique
+  password String
+  role  roles @default(user)
+  createAt DateTime @default(now())
+  transaction Transaction[]
+}
+enum roles {
+user
+admin
+}
+
+model Category {
+  id     Int        @id @default(autoincrement())
+  name   String
+  onMeds Medicine[]
+}
+
+model Medicine {
+  id                String              @id @default(uuid())
+  name              String  @unique
+  categoryId        Int
+  price             Int
+  stock             Int
+  drug_class        Class
+  indication        String?
+  dosage            String
+  min_age           Int
+  side_effect       String?
+  isDeleted   Boolean  @default(false)
+  image       String?  @default("default.png")
+  category          Category            @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  detailtransaction detailTransaction[]
+}
+
+model Transaction {
+  id     String              @id @default(uuid())
+  dates  DateTime @default(now())
+  userId String
+  totalPay Int      @default(0)
+  status   String   @default("SUCCESS")
+  user   User     @relation(fields: [userId], references: [id])
+  detail detailTransaction[]
+
+}
+
+model detailTransaction {
+  id            Int         @id @default(autoincrement())
+  transactionId String
+  medicineId    String
+  qty           Int
+  price         Int         @default(0)
+  medicine      Medicine    @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+}
+
+enum Class {
+  Obat_Bebas
+  Obat_Bebas_Terbatas
+  Obat_keras
+}
