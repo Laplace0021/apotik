@@ -1,107 +1,110 @@
-const {prisma} = require("../config/db");
-const bcrypt =require("bcryptjs")
-const {generateToken} =require("../utils/generateToken")
+const { prisma } = require("../config/db");
+const bcrypt = require("bcryptjs");
+const { generateToken } = require("../utils/generateToken");
 
-const register = async(req,res) =>{
-    const {name, email, password,role} = req.body;
-    
-    const userExist = await prisma.user.findUnique({
-        where: {email: email},
-    })
+const register = async (req, res) => {
+  const { name, email, password, role } = req.body;
 
-    if (userExist){
-        return res.status(400).json({Error:"User already exist with this email"});
-    };
+  const userExist = await prisma.user.findUnique({
+    where: { email: email },
+  });
 
-    //hash password
-    const salt = await bcrypt.genSalt(10)
-    const hashedPassword = await bcrypt.hash(password, salt);
-    
+  if (userExist) {
+    return res
+      .status(400)
+      .json({ Error: "User already exist with this email" });
+  }
 
-    //create user
-    const user = await prisma.user.create({
-        data:{
-            name,
-            email,
-            password: hashedPassword,
-            role
-        }
-    })
-    const token =generateToken(user.id,res);
+  //hash password
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(password, salt);
 
-    res.status(201).json({
-        status:"success",
-        data:{
-            user:{
-                id: user.id,
-                name: name,
-                email: email,
-                role,
-            },
-            token,
-        }
-    })
+  //create user
+  const user = await prisma.user.create({
+    data: {
+      name,
+      email,
+      password: hashedPassword,
+      role,
+    },
+  });
+  const token = generateToken(user.id, user.role, res);
 
+  res.status(201).json({
+    status: "success",
+    data: {
+      user: {
+        id: user.id,
+        name: name,
+        email: email,
+        role: user.role,
+      },
+      token,
+    },
+  });
 };
 
 const login = async (req, res) => {
-    const {email, password} = req.body;
-    
-    const user = await prisma.user.findUnique({
-        where: {email: email}
-    })
+  const { email, password } = req.body;
 
-    if (!user){
-        return res.status(401).json({Error:"Wrong email or password"});
-    }
+  const user = await prisma.user.findUnique({
+    where: { email: email },
+  });
 
-    const isPasswordValid = await bcrypt.compare(password,user.password)
+  if (!user) {
+    return res.status(401).json({ Error: "Wrong email or password" });
+  }
 
-    if (!isPasswordValid){
-        return res.status(401).json({Error:"Wrong email or password"});   
-    }
+  const isPasswordValid = await bcrypt.compare(password, user.password);
 
-    //generate token
-    const token =generateToken(user.id,res);
+  if (!isPasswordValid) {
+    return res.status(401).json({ Error: "Wrong email or password" });
+  }
 
-    res.status(201).json({
-        status:"success",
-        data:{
-            user:{
-                id: user.id,
-                email: email,
-            },
-        },token
-    })
-}
+  //generate token
+  const token = generateToken(user.id, user.role, res);
 
-const logout = async(req, res) => {
-    res.cookie("jwt", "",{
-        httpOnly: true,
-        expires: new Date(0)
-    });
-    res.status(200).json({
-        status: "success",
-        message: " Logged out successfully"
-    });
-}
-const getMe = async (req, res) => {
-    // Tidak perlu try-catch database lagi, karena datanya sudah ada di memori (req.user)
-    
-    if (!req.user) {
-        // Jaga-jaga kalau middleware bocor (seharusnya tidak mungkin sampai sini kalau diprotect)
-        return res.status(404).json({
-            status: "fail",
-            message: "User data missing"
-        });
-    }
-
-    res.status(200).json({
-        status: "success",
-        data: {
-            user: req.user // Langsung ambil dari middleware!
-        }
-    });
+  res.status(201).json({
+    status: "success",
+    data: {
+      user: {
+        id: user.id,
+        name: user.name,
+        email: email,
+        role: user.role,
+      },
+    },
+    token,
+  });
 };
 
-module.exports={register,login,logout,getMe}
+const logout = async (req, res) => {
+  res.cookie("jwt", "", {
+    httpOnly: true,
+    expires: new Date(0),
+  });
+  res.status(200).json({
+    status: "success",
+    message: " Logged out successfully",
+  });
+};
+const getMe = async (req, res) => {
+  // Tidak perlu try-catch database lagi, karena datanya sudah ada di memori (req.user)
+
+  if (!req.user) {
+    // Jaga-jaga kalau middleware bocor (seharusnya tidak mungkin sampai sini kalau diprotect)
+    return res.status(404).json({
+      status: "fail",
+      message: "User data missing",
+    });
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      user: req.user, // Langsung ambil dari middleware!
+    },
+  });
+};
+
+module.exports = { register, login, logout, getMe };
