@@ -88,5 +88,42 @@ const getMyTransaction = async (req, res) => {
   }
 };
 
+const getAllTransaction = async (req, res) => {
+  try {
+    // Pastikan hanya Admin yang bisa akses (sudah dicek di route biasanya, tapi aman ditambahkan)
+    const transactions = await prisma.transaction.findMany({
+      include: {
+        user: { select: { name: true, email: true } }, // Lihat siapa pembelinya
+        detail: {
+          include: { medicine: true }
+        }
+      },
+      orderBy: { dates: "desc" }
+    });
+
+    res.status(200).json({ status: "success", data: transactions });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// 4. FUNGSI UNTUK ADMIN: UPDATE STATUS (Lunas/Batal)
+const updateStatusTransaction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body; // SUCCESS, PENDING, CANCELLED
+
+    const updated = await prisma.transaction.update({
+      where: { id: id },
+      data: { status: status }
+    });
+
+    res.status(200).json({ status: "success", data: updated });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // 3. JANGAN LUPA DUA-DUANYA DI-EXPORT!
-module.exports = { addTransaction, getMyTransaction };
+module.exports = { addTransaction, getMyTransaction,getAllTransaction, 
+  updateStatusTransaction };
