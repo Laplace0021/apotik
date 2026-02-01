@@ -1,5 +1,6 @@
 const { prisma } = require("../config/db");
 const { param } = require("../routes/auth");
+const cloudinary = require("../config/cloudinary");
 const addMedicine = async (req, res) => {
   try {
     const { 
@@ -37,51 +38,45 @@ const addMedicine = async (req, res) => {
   }
 };
 // ... (addMedicine tetap sama)
-
 const updateMedicine = async (req, res) => {
   try {
     const { id } = req.params;
     const { 
-      medicineName, 
-      categoryId, 
-      price, 
-      stock, 
-      drug_class, 
-      indication, 
-      dosage, 
-      min_age 
+      medicineName, categoryId, price, stock, 
+      drug_class, indication, dosage, min_age, image_url 
     } = req.body;
 
-    // 1. Cek apakah obatnya ada
-    const existingMedicine = await prisma.medicine.findUnique({ where: { id } });
-    if (!existingMedicine) {
-        return res.status(404).json({ error: "Medicine not found" });
+    let finalImageUrl = null;
+
+    // Prioritas 1: Jika user upload file baru (dari req.file)
+    if (req.file) {
+      finalImageUrl = req.file.path;
+    } 
+    // Prioritas 2: Jika tidak ada file baru, pakai URL lama (dari req.body)
+    else if (image_url) {
+      // Proteksi jika data terkirim ganda (Array), ambil index pertama saja
+      finalImageUrl = Array.isArray(image_url) ? image_url[0] : image_url;
     }
 
-    // 2. Logika Gambar: Jika ada file baru (req.file), pakai path Cloudinary. 
-    // Jika tidak, tetap pakai image yang sudah ada di database.
-    const imageUrl = req.file ? req.file.path : (req.body.image_url || "https://placehold.co/400x400?text=No+Image");
-
-// Simpan imageUrl ini ke database Prisma
-
-    // 3. Eksekusi Update
     const updated = await prisma.medicine.update({
-      where: { id },
+      where: { id: id },
       data: {
-        name: medicineName || existingMedicine.name,
-        categoryId: categoryId ? parseInt(categoryId) : existingMedicine.categoryId,
-        price: price ? parseInt(price) : existingMedicine.price,
-        stock: stock !== undefined ? parseInt(stock) : existingMedicine.stock,
-        drug_class: drug_class || existingMedicine.drug_class,
-        indication: indication || existingMedicine.indication,
-        dosage: dosage || existingMedicine.dosage,
-        min_age: min_age ? parseInt(min_age) : existingMedicine.min_age,
-        image: imageUrl,
-      },
+        name: medicineName,
+        categoryId: parseInt(categoryId),
+        price: parseInt(price),
+        stock: parseInt(stock),
+        drug_class: drug_class,
+        indication: indication,
+        dosage: dosage,
+        min_age: parseInt(min_age),
+        // Hanya update kolom image jika finalImageUrl ada nilainya
+        ...(finalImageUrl && { image: finalImageUrl })
+      }
     });
 
     res.status(200).json({ status: "success", data: updated });
   } catch (error) {
+    console.error("Update Error:", error);
     res.status(500).json({ error: error.message });
   }
 };
