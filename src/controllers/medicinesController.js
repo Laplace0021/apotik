@@ -1,80 +1,90 @@
 const { prisma } = require("../config/db");
 const { param } = require("../routes/auth");
+const addMedicine = async (req, res) => {
+  try {
+    const { 
+      medicineName, 
+      categoryId, 
+      price, 
+      stock, 
+      drug_class, // Harus string yang sesuai Enum: "Obat_Bebas" dll
+      indication, 
+      dosage, 
+      min_age 
+    } = req.body;
 
-const addMedicine= async(req,res)=>{
-    const {medicineName,categoryId,price,stock,drug_class,indication,dosage,min_age,side_effect}=req.body;
-    //check if medicine exist
-    const medicineExist = await prisma.medicine.findUnique({
-        where: {name: medicineName},
-    });
-    if(medicineExist){
-        return res.status(401).json({error:"Medicine already exist"})
-    };
+    const imageUrl = req.file ? req.file.path : (req.body.image_url || "https://placehold.co/400x400?text=No+Image");
 
-    //create 
+// Simpan imageUrl ini ke database Prisma
+
     const medicine = await prisma.medicine.create({
-        data:{
-            name: medicineName,
-            categoryId,
-            price,
-            stock,
-            drug_class,
-            indication,
-            dosage,
-            min_age,
-            side_effect
-        }
-    })
-res.status(201).json({
-  status: "success",
-  data: medicine
-})
+      data: {
+        name: medicineName,
+        categoryId: parseInt(categoryId),
+        price: parseInt(price),
+        stock: parseInt(stock),
+        drug_class: drug_class, 
+        indication,
+        dosage,
+        min_age: parseInt(min_age),
+        image: imageUrl
+      }
+    });
 
+    res.status(201).json({ status: "success", data: medicine });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+// ... (addMedicine tetap sama)
 
-}
 const updateMedicine = async (req, res) => {
+  try {
     const { id } = req.params;
     const { 
-        name, 
-        price, 
-        stock, 
-        addStock, 
-        categoryId,
-        description 
+      medicineName, 
+      categoryId, 
+      price, 
+      stock, 
+      drug_class, 
+      indication, 
+      dosage, 
+      min_age 
     } = req.body;
-    try {
-        if (req.user.role !== "admin") {
-            return res.status(403).json({ error: "Access denied" });
-        }
-        const existingMedicine = await prisma.medicine.findUnique({ where: { id } });
-        if (!existingMedicine) {
-            return res.status(404).json({ error: "Medicine not found" });
-        }
-        const dataToUpdate = {};
-        if (name) dataToUpdate.name = name;
-        if (price) dataToUpdate.price = parseInt(price);
-        if (categoryId) dataToUpdate.categoryId = parseInt(categoryId);
-        if (description) dataToUpdate.description = description;
-        if (addStock) {
-            dataToUpdate.stock = { increment: parseInt(addStock) };
-        } else if (stock !== undefined) {
-            dataToUpdate.stock = parseInt(stock);
-        }
-        const updatedItem = await prisma.medicine.update({
-            where: { id },
-            data: dataToUpdate
-        });
 
-        res.status(200).json({
-            status: "success",
-            data: { medicine: updatedItem }
-        });
-
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+    // 1. Cek apakah obatnya ada
+    const existingMedicine = await prisma.medicine.findUnique({ where: { id } });
+    if (!existingMedicine) {
+        return res.status(404).json({ error: "Medicine not found" });
     }
-}
 
+    // 2. Logika Gambar: Jika ada file baru (req.file), pakai path Cloudinary. 
+    // Jika tidak, tetap pakai image yang sudah ada di database.
+    const imageUrl = req.file ? req.file.path : (req.body.image_url || "https://placehold.co/400x400?text=No+Image");
+
+// Simpan imageUrl ini ke database Prisma
+
+    // 3. Eksekusi Update
+    const updated = await prisma.medicine.update({
+      where: { id },
+      data: {
+        name: medicineName || existingMedicine.name,
+        categoryId: categoryId ? parseInt(categoryId) : existingMedicine.categoryId,
+        price: price ? parseInt(price) : existingMedicine.price,
+        stock: stock !== undefined ? parseInt(stock) : existingMedicine.stock,
+        drug_class: drug_class || existingMedicine.drug_class,
+        indication: indication || existingMedicine.indication,
+        dosage: dosage || existingMedicine.dosage,
+        min_age: min_age ? parseInt(min_age) : existingMedicine.min_age,
+        image: imageUrl,
+      },
+    });
+
+    res.status(200).json({ status: "success", data: updated });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
 
 const deleteMedicine = async (req, res) => {
     const { id } = req.params; // Perbaikan dari req.param ke req.params
@@ -96,48 +106,42 @@ const deleteMedicine = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 }
-
 const getMedicine = async (req, res) => {
-    try {
-        // 1. Ambil query parameter dari URL
-        const { search, category } = req.query;
+  try {
+    const { search, category } = req.query;
 
-        // 2. Bangun filter 'where' secara dinamis
-        const whereClause = {
-            isDeleted: false, // Filter utama: jangan ambil yang sudah dihapus
-        };
+    const whereClause = {
+      isDeleted: false,
+    };
 
-        // Jika ada pencarian nama
-        if (search) {
-            whereClause.name = {
-                contains: search,
-                mode: 'insensitive', // Case-insensitive
-            };
-        }
+    if (search) {
+      whereClause.name = {
+        contains: search,
+        mode: 'insensitive',
+      };
+    }
 
-        // Jika ada filter kategori (berdasarkan nama kategori)
-        if (category && category !== "Semua Obat") {
-            whereClause.category = {
-                name: category // Filter relasi ke tabel Category berdasarkan field 'name'
-            };
-        }
+    // Filter berdasarkan NAMA Kategori
+    if (category && category !== "Semua Obat") {
+      whereClause.category = {
+        name: category 
+      };
+    }
 
-        const medicines = await prisma.medicine.findMany({
-            where: whereClause,
-            include: {
-                category: true 
-            },
-            orderBy: {
-                name: 'asc' // Urutkan abjad agar rapi
-            }
-        });
+    const medicines = await prisma.medicine.findMany({
+      where: whereClause,
+      include: {
+        category: true // Ini akan mengambil objek kategori lengkap
+      },
+      orderBy: { name: 'asc' }
+    });
 
-        res.status(200).json({
-            status: "success",
-            data: { medicines }
-        });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+    res.status(200).json({
+      status: "success",
+      data: { medicines }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };
 const getMedicineById = async (req, res) => {

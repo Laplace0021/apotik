@@ -42,10 +42,11 @@ model Medicine {
   drug_class        Class
   indication        String?
   dosage            String
+  
   min_age           Int
   side_effect       String?
   isDeleted   Boolean  @default(false)
-  image       String?  @default("default.png")
+  image       String?  @default("https://placehold.co/400x400?text=No+Image")
   category          Category            @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   detailtransaction detailTransaction[]
 }
